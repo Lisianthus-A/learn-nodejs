@@ -17,7 +17,7 @@ mongoose.connect(mongoUri, {
     useFindAndModify: false,
     useCreateIndex: true
 })
-    .then(result => {
+    .then(() => {
         console.log('connected to MongoDb');
     })
     .catch(error => {
@@ -34,7 +34,7 @@ const logger = (request, response, next) => {
     console.log('Body:  ', request.body);
     console.log('---');
     next();
-}
+};
 app.use(logger);
 
 //请求根目录
@@ -50,20 +50,22 @@ app.get('/api/notes', (request, response) => {
 });
 
 //添加 note
-app.post('/api/notes', (request, response) => {
+app.post('/api/notes', (request, response, next) => {
     const { content, important } = request.body;
-    if (!content) {
-        return response.status(400).json({ error: 'content missing' });
-    }
 
     const note = new Note({
         content,
-        important,
+        important: important || false,
         date: new Date()
     });
 
     //保存 note 到数据库后，返回已保存的对象
-    note.save().then(savedNote => response.json(savedNote));
+    note.save()
+        .then(savedNote => savedNote.toJSON())
+        .then(savedAndFormattedNote => {
+            response.json(savedAndFormattedNote);
+        })
+        .catch(error => next(error));
 });
 
 //更新指定 id 的 note
@@ -97,7 +99,7 @@ app.get('/api/notes/:id', (request, response, next) => {
 app.delete('/api/notes/:id', (request, response, next) => {
     const { id } = request.params;
     Note.findByIdAndRemove(id)
-        .then(result => {
+        .then(() => {
             response.status(204).end();
         })
         .catch(error => next(error));
@@ -108,15 +110,18 @@ const errorHandler = (error, request, response, next) => {
     if (error.name === 'CastError' && error.kind === 'ObjectId') {
         response.status(400).send({ error: 'malformatted id' });
         return;
+    } else if (error.name === 'ValidationError') {
+        response.status(400).json({ error: error.message });
+        return;
     }
 
     next(error);
-}
+};
 app.use(errorHandler);
 
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' });
-}
+};
 app.use(unknownEndpoint);
 
 app.listen(PORT, () => {
