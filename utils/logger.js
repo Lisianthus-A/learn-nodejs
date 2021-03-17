@@ -1,9 +1,11 @@
+const env = process.env.NODE_ENV;
+
 const info = (...params) => {
-    console.log(...params);
+    env !== 'test' && console.log(...params);
 };
 
 const error = (...params) => {
-    console.error(...params);
+    env !== 'test' && console.error(...params);
 };
 
 module.exports = {
